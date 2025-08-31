@@ -14,13 +14,38 @@ HooksFn = Callable[..., None]
 
 class Chain:
     """
-    Composable chain of steps with:
-      - precompiled arg/kw resolvers
-      - precompiled log templates
-      - jittered, deadline-aware retries
-      - hooks & redaction
-      - strict mode (unresolved refs -> errors)
-      - tiny dependency footprint
+    Composable, synchronous step orchestrator.
+
+    A `Chain` lets you declare a sequence of *steps* that pass values via a mutable
+    **context** dictionary. Each step can declare inputs by referencing context keys
+    (including dotted paths), and write its output to a named key via `out`.
+
+    Features:
+      - Precompiled argument/keyword resolvers (fast, no reflection at runtime)
+      - Retries with backoff + optional jitter, deadline awareness
+      - Per-step validation hooks (fail-fast, not retried)
+      - Structured logging via templated `log_fmt` (with `{dotted.refs}`)
+      - Before/after hooks and message redaction
+      - `strict` mode to error on unresolved references
+
+    Args:
+      strict: If True, unresolved dotted refs raise `LookupError`. Otherwise they resolve to `None`.
+      before_step: Optional hook called before each step: `(step, context) -> None`.
+      after_step: Optional hook called after each step: `(step, context, result, elapsed) -> None`.
+      on_retry: Optional hook called on retry: `(step, exc, attempt, next_delay) -> None`.
+      redact: Optional function to scrub log lines before emission.
+      deadline_fn: Optional function returning remaining seconds for deadline-aware retries.
+      safety_margin: Minimum seconds to keep as buffer before deadline when sleeping.
+      jitter: If True, randomize delay within the backoff window.
+
+    Example:
+      >>> from stepchain import Chain
+      >>> def add(a, b): return a + b
+      >>> ctx = (Chain().put("x", 2).put("y", 3)
+      ...         .next(add, out="sum", args=["x","y"])
+      ...         .run())
+      >>> ctx["sum"]
+      5
     """
 
     def __init__(
@@ -47,6 +72,17 @@ class Chain:
         self._jitter = jitter
 
     def put(self, key: str, value: Any) -> "Chain":
+        """
+        Preload a key/value into the chain context.
+
+        Args:
+          key: Context key.
+          value: Value to store.
+
+        Returns:
+          Self (for fluent chaining).
+        """
+
         self._ctx[key] = value
         return self
 
@@ -66,6 +102,27 @@ class Chain:
         log_fmt: Optional[str] = None,
         validate: Optional[Callable[[Any], None]] = None,
     ) -> "Chain":
+        """
+        Append a step to the chain.
+
+        Args:
+          func: Callable to execute. Its parameters are resolved from context using `args`/`kwargs`.
+          out: Context key to store the step's return value.
+          args: Positional argument **specs**. Each item can be a literal or a context ref (e.g. `"sum"`, `"obj.attr"`).
+          kwargs: Keyword argument **specs** using the same rules as `args`.
+          name: Optional display name for logs; defaults to `out` or `func.__name__`.
+          retries: Max retries on exceptions matching `retry_on`. Validation errors never retry.
+          retry_on: Tuple of exception types that are retryable.
+          backoff: Initial delay multiplier between retries.
+          max_backoff: Max delay cap.
+          log: Optional callback `(ctx, result) -> None` for custom logging.
+          log_fmt: Log template with `{dotted.refs}`. Supports `{key.__len__}` and zero-arg callables (e.g., `model_dump`).
+          validate: Optional `(result) -> None` that raises to mark invalid results.
+
+        Returns:
+          Self (for fluent chaining).
+        """
+
         spec = StepSpec(
             func=func,
             out=out,
@@ -96,6 +153,21 @@ class Chain:
             return float("inf")
 
     def run(self) -> Dict[str, Any]:
+        """
+        Execute the chain synchronously.
+
+        The context is mutated in-place as steps run. If a step fails with a retryable error,
+        backoff + jitter + deadline checks are applied. If the deadline is exceeded, a
+        `StepFailedError` is raised. Validation failures raise `ValidationFailedError` immediately.
+
+        Returns:
+          The final context dictionary.
+
+        Raises:
+          ValidationFailedError: A step's `validate` hook failed.
+          StepFailedError: Retries exhausted or deadline exceeded.
+        """
+
         for spec in self._steps:
             step_name = spec.name or spec.out or getattr(spec.func, "__name__", "step")
             start = time.perf_counter()
@@ -202,4 +274,11 @@ class Chain:
 
     @property
     def context(self) -> Dict[str, Any]:
+        """
+        Snapshot of the current context.
+
+        Returns:
+          A shallow copy of the context dict (safe to inspect).
+        """
+
         return dict(self._ctx)

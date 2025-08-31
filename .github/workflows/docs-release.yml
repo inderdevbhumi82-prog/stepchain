@@ -1,0 +1,57 @@
+name: docs-release
+
+on:
+  release:
+    types: [published]   # runs when you publish a GitHub Release
+
+permissions:
+  contents: write        # needed to push to gh-pages
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "docs-release"
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # mike needs history
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install docs deps
+        run: pip install ".[docs]"
+
+      - name: Configure Git user (for mike commit)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Extract version (e.g., "v0.4.1" -> "0.4.1")
+      - name: Compute docs version
+        id: ver
+        run: |
+          RAW="${GITHUB_REF_NAME}"
+          # If tag starts with 'v', strip it
+          if [[ "${RAW}" == v* ]]; then
+            echo "docver=${RAW#v}" >> $GITHUB_OUTPUT
+          else
+            echo "docver=${RAW}" >> $GITHUB_OUTPUT
+          fi
+
+      # Build and publish with mike
+      - name: Build & deploy docs for this version
+        run: |
+          DOCVER="${{ steps.ver.outputs.docver }}"
+          # Build docs into gh-pages with this version and set/point 'latest'
+          mike deploy --push --update-aliases "${DOCVER}" latest
+          mike set-default --push latest

@@ -32,11 +32,26 @@ async def _call_func(func: Func, *args, allow_sync: bool = True, **kwargs):
 
 class AsyncChain:
     """
-    Async version of Chain:
-      - awaits async steps
-      - optional offloading of sync steps via asyncio.to_thread
-      - jittered, deadline-aware retries
-      - async or sync hooks supported
+    Async orchestrator with the same semantics as `Chain`.
+
+    Differences:
+      - Awaits async steps; can also offload sync steps via `asyncio.to_thread`.
+      - Hooks can be async or sync.
+      - Uses `asyncio.sleep` during backoff.
+
+    Args:
+      strict: If True, unresolved dotted refs raise `LookupError`. Otherwise resolve to `None`.
+      before_step: Optional hook (sync or async): `(step, context) -> None | Awaitable`.
+      after_step: Optional hook (sync or async): `(step, context, result, elapsed) -> None | Awaitable`.
+      on_retry: Optional hook (sync or async) for retry events.
+      redact: Optional log redactor.
+      deadline_fn: Optional function returning remaining seconds.
+      safety_margin: Deadline buffer.
+      jitter: Randomize sleep in backoff window.
+      allow_sync: If True, synchronous steps are offloaded with `asyncio.to_thread`.
+
+    See Also:
+      `Chain` for the synchronous variant.
     """
 
     def __init__(
@@ -65,6 +80,8 @@ class AsyncChain:
         self._allow_sync = allow_sync
 
     def put(self, key: str, value: Any) -> "AsyncChain":
+        """See `Chain.put`."""
+
         self._ctx[key] = value
         return self
 
@@ -84,6 +101,8 @@ class AsyncChain:
         log_fmt: Optional[str] = None,
         validate: Optional[Callable[[Any], None]] = None,
     ) -> "AsyncChain":
+        """See `Chain.next` (async compatible)."""
+
         spec = StepSpec(
             func=func,
             out=out,
@@ -113,6 +132,8 @@ class AsyncChain:
             return float("inf")
 
     async def run(self) -> Dict[str, Any]:
+        """Execute the async chain. See `Chain.run` for semantics."""
+
         for spec in self._steps:
             step_name = spec.name or spec.out or getattr(spec.func, "__name__", "step")
             start = time.perf_counter()

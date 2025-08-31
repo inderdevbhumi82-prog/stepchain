@@ -1,0 +1,35 @@
+name: docs-next
+
+on:
+  push:
+    branches: [ master ]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "docs-next"
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish-docs-next:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install docs deps
+        run: pip install ".[docs]"
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Build & deploy next
+        run: |
+          mike deploy --push next

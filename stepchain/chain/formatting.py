@@ -15,7 +15,20 @@ def _const_renderer(s: str) -> Callable[[Mapping[str, Any], Any], str]:
 
 
 def compile_logfmt(fmt: str | None) -> Callable[[Mapping[str, Any], Any], str] | None:
-    """Precompile a log format with {dotted.path} tokens into a fast formatter."""
+    """
+    Precompile a logging template with `{dotted.refs}`.
+
+    Supported tokens:
+      - `{key.path}`: read from context
+      - `{result.path}`: read from current step result
+      - `{key.__len__}`: length of the resolved value
+      - zero-arg callables (e.g. `{plan.model_dump}`)
+      - dict/list are JSON-serialized
+
+    Returns:
+      A renderer `(ctx, result) -> str`, or `None` if `fmt` is falsy.
+    """
+
     if not fmt:
         return None
 
@@ -115,6 +128,7 @@ def _coerce_value(val: Any) -> str:
 
 
 def format_dotted(fmt: str, ctx: Mapping[str, Any], result: Any) -> str:
-    """Compatibility wrapper used by older codepaths; now runs the compiled formatter."""
+    """Compatibility wrapper that calls the compiled renderer."""
+
     render = compile_logfmt(fmt)
     return render(ctx, result) if render else ""
