@@ -1,0 +1,46 @@
+site_name: Py StepChain
+repo_url: https://github.com/inderdevbhumi82-prog/stepchain
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - content.code.copy
+    - version
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            docstring_style: google
+            show_source: false
+            show_signature: true
+            separate_signature: true
+            members_order: source
+            filters:
+              - "!^_"
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - fenced_code
+  - tables
+  - pymdownx.snippets:
+      base_path:
+        - "."
+      check_paths: true
+nav:
+  - Home: index.md
+  - Why StepChain: why-stepchain.md
+  - Use Cases: use-cases.md
+  - Getting Started: getting-started.md
+  - Features: features.md
+  - Comparison: comparison.md
+  - API Reference:
+      - Chain: reference/chain.md
+      - AsyncChain: reference/async_chain.md
+      - Exceptions: reference/exceptions.md
+      - Context & Formatting: reference/support.md
