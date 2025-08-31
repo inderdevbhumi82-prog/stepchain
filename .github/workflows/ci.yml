@@ -44,3 +44,9 @@ jobs:
         with:
           name: coverage-${{ matrix.python-version }}
           path: ./.coverage*
+
+      - name: Install docs deps
+        run: pip install ".[docs]"
+
+      - name: Build docs
+        run: mkdocs build --strict

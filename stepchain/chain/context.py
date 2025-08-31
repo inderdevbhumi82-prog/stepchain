@@ -3,6 +3,18 @@ from typing import Any, Callable, Mapping, Tuple, NoReturn
 
 
 def get_dotted(root: Any, path: str) -> Any:
+    """
+    Resolve a dotted path against a mapping/object.
+
+    Examples:
+      >>> get_dotted({"a": {"b": 1}}, "a.b")
+      1
+      >>> class X: pass
+      >>> x = X(); x.v = 3
+      >>> get_dotted({"x": x}, "x.v")
+      3
+    """
+
     cur = root
     for p in path.split("."):
         if cur is None:
@@ -47,7 +59,18 @@ def _const(value: Any) -> Callable[[Mapping[str, Any]], Any]:
 
 
 def compile_ref(ref: Any, strict: bool = False) -> Callable[[Mapping[str, Any]], Any]:
-    """Compile a ref (literal | key | dotted) into a fast resolver callable."""
+    """
+    Compile a reference spec into a resolver callable.
+
+    - Literals return as-is.
+    - `"key"` fetches from context.
+    - `"key.inner.attr"` traverses mappings/attributes.
+    - In `strict` mode, unresolved references raise `LookupError`.
+
+    Returns:
+      A function `(ctx) -> value` used at runtime to fetch the argument value.
+    """
+
     if not isinstance(ref, str):
         return _const(ref)
     if "." in ref:
@@ -67,4 +90,6 @@ def compile_ref(ref: Any, strict: bool = False) -> Callable[[Mapping[str, Any]],
 def compile_kwargs(
     kwargs: Mapping[str, Any], strict: bool = False
 ) -> Mapping[str, Callable[[Mapping[str, Any]], Any]]:
+    """Vectorized `compile_ref` for kwargs specs."""
+
     return {k: compile_ref(v, strict) for k, v in kwargs.items()}
