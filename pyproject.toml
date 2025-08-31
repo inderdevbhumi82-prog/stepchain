@@ -41,7 +41,16 @@ dev = [
   "pytest-asyncio",
   "fastapi[standard]"
 ]
+docs = [
+  "mkdocs",
+  "mkdocs-material",
+  "mike",
+  "mkdocstrings[python]",
+  "mkdocs-include-markdown-plugin",
+  "pymdown-extensions",
+]
 
 [tool.black]
 target-version = ["py310"]
 line-length = 100
+
