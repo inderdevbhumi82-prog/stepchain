@@ -12,5 +12,5 @@
 
 ---
 
-📚 Docs: https://inderdevbhumi82-prog.github.io/stepchain/latest/
+📚 Docs: https://inderdevbhumi82-prog.github.io/stepchain/
 

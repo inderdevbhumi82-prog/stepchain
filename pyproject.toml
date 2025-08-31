@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "py-stepchain"
-version = "0.1.1"
+version = "0.1.2"
 description = "Composable chain-of-steps orchestrator with context passing, logging, retries, and validation."
 readme = "README.md"
 authors = [
